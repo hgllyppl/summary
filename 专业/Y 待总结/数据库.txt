@@ -1,0 +1,11 @@
+# 如果有人问你数据库的原理，叫他看这篇文章
+https://gameinstitute.qq.com/community/detail/107154
+
+# B-Tree和B+Tree
+https://yq.aliyun.com/articles/54437
+
+# MYSQL-B+TREE索引原理
+https://www.jianshu.com/p/486a514b0ded
+
+# 何登成的技术博客
+http://hedengcheng.com/?p=771

@@ -1,0 +1,46 @@
+java.util
+特别注意
+迭代器返回的元素顺序可能跟容器排列的元素顺序不一样
+Hash类集合， 对于此类集合的键，必须保证以下两点
+1 键必须实现equals与hashcode方法
+2 键是不可变的 或者 其状态发生变化但hashCode不会发生变化
+
+List
+ArrayList
+ArrayList.removeAll/retainAll 在1.7/1.8中，这两种方法用了一种匪夷所思的实现方式??? 
+ArrayList.clone/   toArray 浅复制
+ArrayList.containsAll 一个list只要包含另一个list中所有的值，即为真(无需个数相同)
+ArrayList.subList 引用原来的list
+LinkedList
+Vector 区别于ArrayList，同步、默认扩展2倍
+Stack 继承自Vector，同步，仅提供出栈、入栈两个基本功能
+Vector与Stack的不安全方法：迭代器(非容器快照)
+
+Map
+HashMap  1.8之前用桶+链表实现，之后用 桶+链表+平衡树(红黑？)实现
+HashMap.clone 浅复制
+HashMap 允许key,value都为空，所以需要区分key,value本身为空还是非空的key对应着空value
+容量x负载因子=元素数量
+HashTable 区别于HashMap，同步，不允许空值，不要调用实现自Dictionary接口的方法
+Propertise 继承自HashTable，用于读/写 k-v文件，不要调用put方法来存储非string的键/值
+LinkedHashMap 继承自HashMap 按访问/插入顺序迭代(高速缓存"LRU"实现)
+TreeMap用搜索树实现
+Set
+HashSet用HashMap实现
+LinkedHashSet用LinkedHashMap实现
+TreeSet用TreeMap实现
+
+Queue
+PriorityQueue 优先级队列，任意顺序插入，优先级最高的元素先出(任务调度)
+
+Collections.unmodifiable/synchronized/checked
+
+Arrays
+
+BitSet
+
+关于hashMap的容量为什么是2的幂次方的最详细解析
+https://blog.csdn.net/LLF_1241352445/article/details/81321991
+
+skywang12345 如果天空不死 - 博客园
+https://www.cnblogs.com/skywang12345/

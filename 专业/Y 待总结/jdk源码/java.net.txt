@@ -1,0 +1,26 @@
+java.net
+
+其一 地址/套接字/网络接口
+
+地址
+InetAddress/Inet4Address/Inet6Address
+InetAddressImpl/Inet4AddressImpl/Inet6AddressImpl
+
+套接字
+Socket/ServerSocket
+SocketOptions/SocketImpl/AbstractPlainSocketImpl/PlainSocketImpl/SdpSocketImpl/SocksSocketImpl
+
+DatagramSocket/MutlicastSocket
+SocketOptions/DatagramSocketImpl/AbstractPlainDatagramSocketImpl/PlainDatagramSocketImpl
+
+网络接口
+NetworkInterface 提供API以浏览和查询本地机器的所有网络接口
+
+其二 URI/URL/URLConnection
+URI 统一资源标识符，仅解析不访问
+URL 统一资源定位符，解析+访问，访问通过URLConnection实现
+URLStreamHandler 协议处理程序，连接URL与URLConnection
+URLConnection URL所指向的通信连接，具体处理由子类完成
+HTTPURLConnection 提供对HTTP协议的访问
+
+HTTP访问处理类图

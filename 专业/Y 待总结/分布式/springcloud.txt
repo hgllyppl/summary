@@ -1,0 +1,218 @@
+# SOA
+# 远程调用
+feign[FeignAutoConfiguration/FeignClientsConfiguration/DefaultFeignLoadBalancedConfiguration/FeignRibbonClientAutoConfiguration/FeignClientProperties/FeignClientEncodingProperties]
+FeignClientsRegistrar
+  -> registerDefaultConfiguration -> FeignClientSpecification(default.cloud.client.demo.Start.FeignClientSpecification)
+  -> registerFeignClients -> scanner.findCandidateComponents(FeignClient)
+                               -> FeignClientSpecification(cloud.server.demo.FeignClientSpecification)
+                               -> FeignClientFactoryBean(cloud.sdk.demo.service.HelloService)
+
+FeignClientFactoryBean.getObject()
+  -> getBean(FeignContext.class)
+  -> fegin(context)
+      -> get(context, Feign.Builder.class) -> prototype
+      -> configureFeign(context, builder)
+          -> configureUsingConfiguration -> 可以提供bean覆盖默认配置(FeignClientProperties)
+          -> configureUsingProperties
+  -> loadBalance(builder,context,HardCodedTarget)
+      -> getOptional(context, Client.class)
+          -> DefaultFeignLoadBalancedConfiguration.feignClient -> new LoadBalancerFeignClient(new Client.Default(null, null), cachingFactory, clientFactory)
+      -> builder.client(client)
+      -> get(context, Targeter.class)
+      -> targeter.target(this, builder, context, HardCodedTarget)
+          -> builder.target(HardCodedTarget)
+              -> build()
+                  -> new SynchronousMethodHandler.Factory(builder)
+                  -> new ParseHandlersByName(builder,SynchronousMethodHandler.Factory)
+                  -> new ReflectiveFeign(ParseHandlersByName, SynchronousMethodHandler.Factory)
+              -> newInstance(HardCodedTarget)
+                  -> ParseHandlersByName.apply(target)[Map<String, MethodHandler>]
+                  -> Map<String, MethodHandler> -> Map<Method, MethodHandler>
+                  -> new ReflectiveFeign.FeignInvocationHandler(HardCodedTarget, Map<Method, MethodHandler>)
+                  -> Proxy.newProxyInstance
+
+SynchronousMethodHandler.invoke
+  -> buildTemplateFromArgs.create(argv)
+      -> ...
+  -> executeAndDecode(template)
+      -> targetRequest(template)
+          -> IF interceptor.apply(template)
+          -> RequestTemplate.request()
+      -> client.execute(request, options)[LoadBalancerFeignClient]
+          -> clientName & uriWithoutHost
+          -> new FeignLoadBalancer.RibbonRequest(this.delegate, request, uriWithoutHost)
+          -> getClientConfig(options, clientName)
+              -> DEFAULT_OPTIONS ? clientFactory.getClientConfig(clientName)[RibbonClientConfiguration.ribbonClientConfig] : new FeignOptionsClientConfig(options)
+          -> lbClient(clientName)
+              -> lbClientFactory.create(clientName)
+                  -> lb & config & serverIntrospector -> factory.getInstance(clientName, IClientConfig/ILoadBalancer/ServerIntrospector.class);
+                  -> enableRetry ? new RetryableFeignLoadBalancer(lb, config, serverIntrospector, loadBalancedRetryPolicyFactory, loadBalancedBackOffPolicyFactory, loadBalancedRetryListenerFactory)
+                                    : new FeignLoadBalancer(lb, config, serverIntrospector)
+          -> FeignLoadBalancer.executeWithLoadBalancer(ribbonRequest, requestConfig)
+              -> buildLoadBalancerCommand(ribbonRequest, requestConfig)
+                  -> getRequestSpecificRetryHandler(ribbonRequest, requestConfig)
+                  -> LoadBalancerCommand.builder().build()
+              -> command.submit(new ServerOperation(){...})
+                  -> Observable.create/just.concatMap(new Func1<Server, Observable<T>>() {...})
+                  -> IF o.retry(retryPolicy(maxRetrysNext, false))
+                  -> o.onErrorResumeNext(new Func1<Throwable, Observable<T>>() {...})
+              -> command.toBlocking().single()
+                  -> selectServer() -> loadBalancerContext.getServerFromLoadBalancer(loadBalancerURI, loadBalancerKey) -> getLoadBalancer().chooseServer(loadBalancerKey)
+                  -> loadBalancerContext.getServerStats(server) -> getLoadBalancer().getLoadBalancerStats().getSingleServerStat(server)
+                  -> loadBalancerContext.noteOpenConnection(stats)
+                  -> reconstructRequest & execute(reconstructRequest, requestConfig)
+                      -> executeHttpRequest(FeignLoadBalancer/OkHttpLoadBalancingClient/RibbonLoadBalancingHttpClient)
+                  -> loadBalancerContext.noteRequestCompletion(stats, ...)
+          -> RibbonResponse.toResponse()
+      -> decode(response)
+          -> decoder.decode(response, metadata.returnType())
+              -> decoder.decode(response, type)
+                  -> extractor.extractData(new FeignResponseAdapter(response))
+                      -> genericMessageConverter.read(this.responseType, null, responseWrapper)
+      -> ensureClosed(response.body())
+
+# 服务注册与发现
+芋道源码 http://www.iocoder.cn/categories/Eureka/
+eureka-client(EurekaClientAutoConfiguration/EurekaAutoServiceRegistration)
+init
+  DiscoveryClient
+back
+  AsyncResolver
+    -> 刷新eureka地址
+  InstanceInfoReplicator
+    -> discoveryClient.refreshInstanceInfo()
+         -> applicationInfoManager.refreshDataCenterInfoIfRequired()
+         -> applicationInfoManager.refreshLeaseInfoIfRequired()
+         -> status = getHealthCheckHandler().getStatus(instanceInfo.getStatus())
+         -> IFNN status THEN
+              -> applicationInfoManager.setInstanceStatus(status);
+    -> IF dirty THEN
+         -> discoveryClient.register()
+         -> instanceInfo.unsetIsDirty(dirtyTimestamp)
+exec
+  DiscoveryClient.register/renew/fetchRegistry
+    -> 注册时使用appName作为key
+
+eureka-server(EurekaServerAutoConfiguration/EurekaServerInitializerConfiguration)
+EurekaServerAutoConfiguration
+  -> jerseyFilterRegistration()
+       -> bean.setFilter(new ServletContainer(eurekaJerseyApp))
+            此处植入filter并拦截所有以/eureka开头的请求
+            com.sun.jersey.spi.container.servlet.ServletContainer extends HttpServlet implements Filter
+       -> bean.setUrlPatterns(/eureka/*)
+  -> traceFilterRegistration()
+  -> peerAwareInstanceRegistry()
+       -> deltaRetentionTimer.schedule()
+  -> peerEurekaNodes()
+  -> eurekaServerContext()
+  -> eurekaServerBootstrap()
+
+DefaultEurekaServerContext
+  -> initialize()
+       -> peerEurekaNodes.start()
+            -> taskExecutor.scheduleWithFixedDelay[Eureka-PeerNodesUpdater]
+                -> updatePeerEurekaNodes(resolvePeerUrls())
+                     -> createPeerEurekaNode
+       -> registry.init(peerEurekaNodes)
+            -> numberOfReplicationsLastMin.start()
+            -> initializedResponseCache()
+                 -> new ResponseCacheImpl()
+            -> scheduleRenewalThresholdUpdateTask()
+                 -> timer.schedule()[RenewalThresholdUpdater]
+            -> initRemoteRegionRegistry()
+  -> shutdown()
+
+PeerEurekaNode
+  -> PeerEurekaNode()
+       -> set registry/targetHost/replicationClient/serviceUrl/config/maxProcessingDelayMs
+       -> new ReplicationTaskProcessor(targetHost, replicationClient)
+       -> init batchingDispatcher/nonBatchingDispatcher
+            -> new AcceptorExecutor<>()
+                 -> init acceptorThread
+            -> new TaskExecutors<>(new WorkerRunnableFactory<ID, T>())
+                 -> init workerThreads
+            -> new TaskDispatcher<ID, T>(AcceptorExecutor, TaskExecutors)
+
+ResponseCacheImpl
+  -> ResponseCacheImpl()
+       -> set serverConfig/serverCodecs/shouldUseReadOnlyResponseCache/registry
+       -> init readWriteCacheMap
+            -> generatePayload(key)
+       -> IF shouldUseReadOnlyResponseCache THEN timer.schedule(getCacheUpdateTask())[Eureka-CacheFillTimer]
+
+EurekaServerInitializerConfiguration implements SmartLifecycle
+  -> start -> eurekaServerBootstrap.contextInitialized()
+       -> initEurekaEnvironment
+            -> set dataCenter/environment
+       -> initEurekaServerContext
+            -> registry.syncUp()
+                 -> register app from other PeerEurekaNode
+            -> registry.openForTraffic(this.applicationInfoManager, registryCount)
+                 -> init expectedNumberOfRenewsPerMin & numberOfRenewsPerMinThreshold
+                 -> super.postInit()
+                      -> renewsLastMin.start()
+                      -> evictionTimer.schedule()
+            -> EurekaMonitors.registerAllStats()
+  -> stop -> eurekaServerBootstrap.contextDestroyed()
+
+InstanceRegistry.register/renew/cancel
+  -> register
+       -> publishEvent(new EurekaInstanceRegisteredEvent(this, info, leaseDuration, isReplication)
+       -> super.register(info, leaseDuration, isReplication)
+            -> reset leaseDuration
+            -> super.register(info, leaseDuration, isReplication)
+                 -> update registry/recentlyChangedQueue
+                      -> 使用appName作为key
+                 -> invalidateCache
+                 -> and more...
+            -> replicateToPeers(Action.Register, info.getAppName(), info.getId(), info, null, isReplication)
+                 -> IF ... THEN ITER peerEurekaNodes & node.cancel/heartbeat/register/statusUpdate/deleteStatusOverride
+
+# 负责均衡
+ribbon(RibbonAutoConfiguration/EurekaRibbonClientConfiguration/RibbonClientConfiguration)
+init
+back
+exec
+ZoneAvoidanceRule -> ZoneAvoidancePredicate -> AvailabilityPredicate -> alwaysTrue -> chooseRoundRobinAfterFiltering
+MaxAutoRetriesNextServer 重新进入selectServer逻辑，重试的节点根据负载均衡策略选取，多节点的情况下可能继续重试到下线的节点上去
+
+# 监控
+actuator
+EndpointWebMvcAutoConfiguration -> maybe createChildManagementContext
+EndpointWebMvcManagementContextConfiguration
+
+boot-admin-client
+
+boot-admin-server
+  - client/eureka-reg/unreg -> map
+  - sse
+  - ui-request
+      - ZuulHandlerMapping -> lookupHandler(registerHandlers())
+  *
+  *
+  - reg/unreg -> pubEvent
+      - app-status <- receive event
+      - sse <- receive event
+      - app-router <- receive event
+
+# 服务追踪
+brave
+zipkin
+  - dependency-tree
+      - SpanNode.Builder -> SpanNode
+      - DependencyLinker -> DependencyLink
+
+# 配置中心
+
+# 服务断路
+
+# 服务治理
+
+# FAQ
+bean初始化时在init方法里面提前进行了rpc调用，现象是ribbon配置没有生效，原因是netflix全局使用了一个静态的资源配置，而这个静态配置还没有被spring注入
+
+微服务注册中心Eureka架构深入解读
+https://www.infoq.cn/article/jlDJQ*3wtN2PcqTDyokh
+
+防雪崩利器：熔断器 Hystrix 的原理与使用 - 编程随笔 - SegmentFault 思否
+https://segmentfault.com/a/1190000005988895

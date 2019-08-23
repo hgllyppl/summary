@@ -1,0 +1,93 @@
+java.lang
+
+AssertionStatusDirectives  jni相关类，暂时忽略
+
+Object
+equals/hashCode/toString，equals方法参考I卷P161，toString使用hashCode，hashCode使用内存地址
+wait*3/notify*2
+getClass /clone/finalize，任何Object都不应该重写finalize，因为finalize的执行时间不可确定，释放资源的操作应该在资源使用完毕后就执行
+
+Package  此类描述包相关的信息，不可实例化；jvm加载包时会生成此类的实例，可以通过classloader获取此类的实例以此来获取包信息
+
+Void  仅有一个静态变量(public static final Class<Void> TYPE = Class.getPrimitiveClass("void"))可供外部调用，不明白此类的用法
+
+lang.char
+Character 不可变，是char的包装类型，提供了字符类型(是否字母，数字，空白符，java标识符)的判别，大小写转换，Unicode相关函数等，大部分函数使用位运算和CharacterData实现
+
+lang.class
+Class
+ClassLoader
+bootstrap 引导类加载器，加载JDK，没有父加载器
+ext 扩展类加载器，加载jre/lib/ext下的库，bootstrap为其父加载器
+app 系统类加载器，加载classpath上的库，ext为其父加载器
+双亲委派：类始终由其父加载器加载，父加载器不能加载时才由子加载器加载
+类由类加载器+类全名确定
+如果要掌握类加载器：参考OSGI源码
+Compiler 设计上此类不作任何事情，仅做jit编译器的占位符，当且仅当jvm启动时发现java.compiler属性存在且加载此属性对应的库成功后，调用库中的java_lang_Compiler_start()方法
+ClassValue 动态语言及多语言VM支持
+
+lang.enum
+Enum 所有enum超类，定义了所有方法及实现，values方法是编译时加上的
+
+lang.interface
+Appendable ?
+Readable ?
+CharSequence/Comparable/Iterable/Runnable
+char可读接口/比较/迭代(foreach)/任务
+Cloneable 克隆，如果一个对象可以被克隆，应该实现此接口并覆盖clone方法并将其标记为public
+AutoCloseable 所有实现此接口的类都可以使用try-with-resource来自动关闭资源，jdk7的所有io流都实现了此接口
+
+lang.note
+Deprecated(过时的api)
+Override(覆盖)
+SafeVarargs(压制可变长泛型)
+SuppressWarning(压制警告)
+
+lang.number 除超类Number外，此包下的类都是不可变类型
+Number(SuperClass of Byte Short Integer Long Float Double .etc) 提供6个基本类型的转换方法
+Byte/Short/Integer/Long/Float/Double
+cache(256个,貌似仅整型有),hashCode(num,位运算),Num与String的互换(多种实现),其他函数(位运算)
+Boolean
+hashCode(true?1231:1237),Boolean与String的互换(仅仅”true”能转换成true)
+Math与StrictMath几乎一样，其实现要么用native要么用FpUtils，
+Float/Double 部分使用FloatingDecimal实现
+
+lang.os
+System 提供 时间/环境变量/库 等方法的工具类
+Runtime 每个Java程序都有一个Runtime类实例，与运行环境关联
+Process/ProcessBuilder 进程的封装及创建进程
+SecurityManager/RuntimePermission 权限管理器/可执行权限
+Shutdown/ApplicationShutdownHooks ???
+
+lang.string
+ConditionalSpecialCasing/StringCoding 非公共类，提供给lang包调用的工具类
+AbstractStringBuilder/StringBuffer/StringBuilder，AbstractStringBuilder定义了方法及实现，StringBuffer/StringBuilder继承自AbstractStringBuilder，几乎一样(不一样在哪里？)，全用AbstractStringBuilder实现
+String char[]+Arrys.copy+arraySearch实现
+特别注意：+在java语言规范里被定义为用StringBuilder实现
+特别注意：intern方法，从常量池中取数据，取不到，则添加一份到池中
+不可变设计理由：1缓存(常量池，hashCode) 2 安全(运行时安全，线程安全，hash安全)
+
+lang.thread
+Thread
+
+ThreadGroup
+
+ThreadLocal
+ThreadLocal是对ThreadLocalMap接口的封装，ThreadLocalMap存在于每一个线程之内
+ThreadLocalMap用ThreadLocal作为key，value则是要设置的值；
+ThreadLocalMap用Array实现，其散列方法同hashmap，只是hash冲突的解决方法不一样，hashmap是追加到链表的末尾，而ThreadLocalMap是将其分散在冲突相邻的位置上去
+
+不过ThreadLocal用了一个静态的AtomicInteger来获取hashcode，计算方式是AtomicInteger.getAndAdd(0x61c88647)
+ThreadLocalMap的CAPACITY必须为2的倍数，配合通过0x61c88647计算出来的hashcode进行散列时，貌似完全没有hash冲突
+
+lang.throwable
+Throwable 异常顶层类，定义了所有方法及实现
+StackTraceElement 异常的栈帧类，用与记录帧的类、方法、行号、文件名
+Exception 检查异常，必须捕获
+RuntimeException 未检查异常，无需捕获，运行时可能抛出
+Error 错误，不应该被捕获，由jvm抛出
+VirtualMachineError 虚拟机异常
+更多异常参考业务场景
+ClassNotFoundException与NoClassDefFoundError区别
+ClassNotFoundException可以被捕获，通过显示加载类引起
+NoClassDefFoundError不可捕获，编译时可以找到，运行时找不到此类

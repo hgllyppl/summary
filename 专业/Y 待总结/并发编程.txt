@@ -1,0 +1,126 @@
+# 多线程
+https://www.ibm.com/developerworks/cn/java/j-lo-processthread/
+进程：？？？
+线程：？？？
+线程与进程区别：？？？
+ 
+线程状态
+    NEW：新new了一个线程，还没有执行start方法
+    TERMINATED：一个线程正常执行结束？从JDK定义看，不包含因异常结束的线程 
+    RUNNABLE ：线程可能在执行，也可能在等待CPU时间片
+    BLOCKED：线程在等待锁以进入同步块/方法，或者在调用了Object.wait方法后等待锁以重新进入同步块/方法
+    WAITING ：线程因调用了wait/join/park等方法而进入等待状态
+    TIMED_WAITING ：同WAITING，区别仅仅是sleep/wait/join/parkNanos/parkUntil等方法传入了等待时间
+线程属性：优先级/守护线程/线程组/异常处理器
+线程安全：？？？
+线程安全级别： 不可变/绝对安全/相对安全/线程兼容/线程对立
+
+多线程编程：
+1 异常
+    建议：应当给线程组或Thread类设置异常处理器，用于处理异常
+    默认：如果线程没有设置异常处理器，会自动打印出堆栈
+2 中断
+    语义1，针对OS：切换线程场景，将当前执行的线程场景保存下来，然后装载另一个线程场景并执行这个线程
+    语义2，针对Java：非OS场景的意义，而是要引起线程的注意。若重要线程可以不予理会或处理完后继续运行；若一般线程，通常是要终止此线程的执行，针对不同的场景应使用不同的手段来终止线程。
+3 同步
+  竞争：争夺同一个资源
+  锁：synchronized/ReentrantLock
+  条件：线程获得锁之后发现没有足够的条件继续执行可以调用wait/await方法让自己进入等待状态，进入此状态之后只能被其他线程调用notify/notifyAll/signal/signalAll方法唤醒。为什么条件测试一定是while而非if，因为当线程被唤醒的时候必须再次检查条件，如果是if，被唤醒的时候就不会检查条件而是执行后续命令了。
+
+线程安全的三种方案：
+1 互斥锁
+    语义：先要锁住才能执行同步代码(同悲观锁语义)
+    种类： synchronized、ReentrantLock，优先使用synchronized，当synchronized不能满足时才使用ReentrantLock
+    区别：1 1.5中，synchronized性能差于ReentrantLock，1.6及以后差异不明显  
+               2 ReentrantLock可以实现synchronized不具备的特性，比如锁等待、中断锁、公平锁、条件锁、锁投票
+2 非阻塞同步
+    语义：先不锁，直接执行同步代码，再判断有没有锁冲突，如果没有则执行成功，如果有则重试(同乐观锁语义)
+    种类：需硬件指令集支持，比如CAS
+3 无同步
+    语义：将需要争夺的资源变成不需要争夺
+    种类：可重入，ThreadLocal
+
+锁优化：
+短锁场景：当前线程在下一个线程来获取锁之前完成锁的获取和释放
+1 适应性自旋锁：建立在短锁场景之上，线程在进入锁之前会循环一会儿，如果一会儿之后不能获取锁，还是会进入阻塞状态
+2 锁消除：jvm优化代码的时候直接或间接的产生了同步代码，但在运行的时候发现优化的代码是无需加锁的，所以又消除了锁
+3 锁粗化：将锁的范围扩大
+4 轻量级锁：建立在短锁场景之上，使用CAS来实现，减少互斥量带来的开销，但是一旦锁竞争出现，将会即使用CAS，又使用互斥量来同步，增大开销
+5 偏向锁：？？？
+
+
+
+# 线程池
+https://www.oschina.net/question/565065_86540
+0 准备知识
+线程/位运算/原反补码/CAS/操作系统(???)
+
+1 使用规则
+coreSize：初始线程数量
+maxSize：最大线程数量
+keepAliveTime：当coreSize<workCount<=maxSize，超出coreSize部分的线程的最大空闲时间
+blockQueue：阻塞队列，存储任务
+当workCount<coreSize时，直接加worker执行任务
+当workCount>=coreSize，但是blockQueue没有满，将任务加入到blockQueue
+当workCount>coreSize，blockQueue已满，但是workCount<maxSize时，直接加worker执行任务
+当workCount>coreSize，blockQueue已满，workCount>maxSize时，拒绝执行任务
+
+三种blockQueue
+1 synchronizeQueue：此blockQueue不存储任务，将直接提交任务给工作线程，需将maxSize设置为2^31-1，使其成为无界池；
+2 LinkedBlockQueue：此blockQueue默认为无界，意味着maxSize的设置无效，超过coreSize的任务都将被存储在队列里面；
+3 ArrayBlockQueue：此blockQueue有界，你很难准确的给定blockQueue与maxSize的大小；blockQueue太大，maxSize太小，可能会导致吞吐率下降；blockQueue太小，maxSize太大，可能会导致线程的频繁切换，增大开销；更难的问题是，你很难算出一个业务场景的到底需要多少线程来支撑，即便是能够算出，当业务场景变化时，线程数量恐怕又得再一次调整了
+
+问题1：两种无界池的区别？
+第一种可以解决前后有依赖的任务，第二种不行
+
+问题2：第一种固定maxSize，第二种固定blockQueue与maxSize都将成为有界池，与第三种有界池有什么区别？
+ArrayBlockQueue是Array实现，可以随机访问，这是最大的优势，除此之外，没有区别
+
+拒绝策略：1 直接抛出异常；2 直接丢弃任务；3 使用用户线程执行任务；4 blockQueue踢掉一个旧任务，加入新任务
+
+2 生命周期与工作线程数量
+runState：running/shutdown/stop/tidying/terminated
+workCount：工作线程数量
+capacity：2^29-1(也是工作线程的上限)
+packing：ctl = runState | workCount
+unpack-runState：ctl & ~capacity
+unpack-workCount：ctl & capacity
+
+3 线程的管理
+当提交任务时会判断是否需要增加工作线程；
+工作线程循环从队列里面取任务；如果取不到任务将会退出，退出时会判断是否需要增加工作线程；
+取任务分为阻塞到有任务为止或阻塞一段时间，如果是阻塞到有任务为止，线程将没有退出的机会；如果是阻塞一段时间(keepAliveTime)，阻塞完后还没有任务，线程将会退出
+
+
+
+# 并发编程
+java语言规范
+  对引用的读写操作是原子的，无论是32位还是64位
+  对非volatile的long或double的写不是原子的，虚拟机应尽量避免将64位值分开
+jmm
+  解决什么问题
+  定义
+hb 规定了线程间的偏序关系并用来判断代码是否正确同步
+hb1 同一线程内前面的写对后面的读立即可见
+hb2 一个线程对volatile变量的写对后续另一个线程对volatile变量的读立即可见
+hb3 一个线程在解锁前的写对后续另一个线程在加锁之后的读立即可见
+hb4 如果有hb(1,2)，hb(3,4)且有hb(2,3)，则有hb(1,4)
+
+hb1 是自然序
+hb2 依赖volatie的语义(可见性/有序性)和语言规范(对变量的读写是原子操作)
+hb3 依赖锁
+hb4 传递必须存在，否则不成立
+      - 参考1 HB4Ex1/HB4Ex2
+      - 参考2 http://ifeve.com/easy-happens-before/
+
+Java内存模型（JMM）总结 - 知乎
+https://zhuanlan.zhihu.com/p/29881777
+
+ThreadLocal 内存泄露问题
+https://github.com/Snailclimb/JavaGuide/blob/master/docs/java/Multithread/JavaConcurrencyAdvancedCommonInterviewQuestions.md#34-threadlocal-%E5%86%85%E5%AD%98%E6%B3%84%E9%9C%B2%E9%97%AE%E9%A2%98
+
+skywang12345 如果天空不死 - 博客园
+https://www.cnblogs.com/skywang12345/
+
+【ITer_ZC的专栏】Java_NIO_随手记 - CSDN博客
+https://blog.csdn.net/iter_zc
