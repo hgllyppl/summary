@@ -370,6 +370,29 @@ bean 的生命周期一共分为10步，其实现集中在 AbstractAutowireCapab
 
 ## 事件机制
 ### 注册监听器
+- AbstractApplicationContext.registerListeners
+
+        // 注册 ApplicationListener 并发布 earlyApplicationEvents
+        protected void registerListeners() {
+            // 注册 this.ApplicationListener
+            for (ApplicationListener<?> listener : getApplicationListeners()) {
+                getApplicationEventMulticaster().addApplicationListener(listener);
+            }
+            // 查找并注册 ApplicationListener beanName
+            String[] listenerBeanNames = getBeanNamesForType(ApplicationListener.class, true, false);
+            for (String listenerBeanName : listenerBeanNames) {
+                getApplicationEventMulticaster().addApplicationListenerBean(listenerBeanName);
+            }
+            // 发布 earlyApplicationEvents
+            Set<ApplicationEvent> earlyEventsToProcess = this.earlyApplicationEvents;
+            this.earlyApplicationEvents = null;
+            if (earlyEventsToProcess != null) {
+                for (ApplicationEvent earlyEvent : earlyEventsToProcess) {
+                    getApplicationEventMulticaster().multicastEvent(earlyEvent);
+                }
+            }
+        }
+        
 - EventListenerMethodProcessor
 
         private void processBean(final String beanName, final Class<?> targetType) {
