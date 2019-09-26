@@ -9,7 +9,7 @@ spring-tx 由以下五大核心构成
 - DataSourceTransactionManager 事务管理器，是打开、提交、回滚事务的具体执行者。
 - DefaultTransactionStatus 事务状态，由事务管理器打开事务时产生，其管理着当前事务的状态、事务资源以及可能被挂起的事务资源。
 - RuleBasedTransactionAttribute 事务属性，这个类跟我们编程时使用 @Transactional 息息相关，此类保存着要应用的事务传播行为、隔离级别、超时时间、是否只读以及回滚策略。
-- TransactionSynchronizationManager 事务同步管理器，其绑定者当前事务的资源以及事务属性
+- TransactionSynchronizationManager 事务同步管理器，其绑定着当前事务的资源以及事务属性
 
 下面来看事务处理的流程
 ![](./spring-jdbc&tx/spring-tx.webp)

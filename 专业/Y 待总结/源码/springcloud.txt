@@ -1,12 +1,13 @@
 # SOA
 # 远程调用
-feign[FeignAutoConfiguration/FeignClientsConfiguration/DefaultFeignLoadBalancedConfiguration/FeignRibbonClientAutoConfiguration/FeignClientProperties/FeignClientEncodingProperties]
 FeignClientsRegistrar
-  -> registerDefaultConfiguration -> FeignClientSpecification(default.cloud.client.demo.Start.FeignClientSpecification)
-  -> registerFeignClients -> scanner.findCandidateComponents(FeignClient)
-                               -> FeignClientSpecification(cloud.server.demo.FeignClientSpecification)
-                               -> FeignClientFactoryBean(cloud.sdk.demo.service.HelloService)
+  FeignClientsConfiguration
+FeignRibbonClientAutoConfiguration
+  DefaultFeignLoadBalancedConfiguration/HttpClientFeignLoadBalancedConfiguration/OkHttpFeignLoadBalancedConfiguration
+FeignAutoConfiguration
+  FeignClientProperties/FeignHttpClientProperties
 
+FeginContext -> FeignBuilder -> Feign -> Proxy
 FeignClientFactoryBean.getObject()
   -> getBean(FeignContext.class)
   -> fegin(context)
@@ -70,6 +71,14 @@ SynchronousMethodHandler.invoke
                   -> extractor.extractData(new FeignResponseAdapter(response))
                       -> genericMessageConverter.read(this.responseType, null, responseWrapper)
       -> ensureClosed(response.body())
+
+# 负责均衡
+ribbon(RibbonAutoConfiguration/EurekaRibbonClientConfiguration/RibbonClientConfiguration)
+init
+back
+exec
+ZoneAvoidanceRule -> ZoneAvoidancePredicate -> AvailabilityPredicate -> alwaysTrue -> chooseRoundRobinAfterFiltering
+MaxAutoRetriesNextServer 重新进入selectServer逻辑，重试的节点根据负载均衡策略选取，多节点的情况下可能继续重试到下线的节点上去
 
 # 服务注册与发现
 芋道源码 http://www.iocoder.cn/categories/Eureka/
@@ -167,46 +176,6 @@ InstanceRegistry.register/renew/cancel
                  -> and more...
             -> replicateToPeers(Action.Register, info.getAppName(), info.getId(), info, null, isReplication)
                  -> IF ... THEN ITER peerEurekaNodes & node.cancel/heartbeat/register/statusUpdate/deleteStatusOverride
-
-# 负责均衡
-ribbon(RibbonAutoConfiguration/EurekaRibbonClientConfiguration/RibbonClientConfiguration)
-init
-back
-exec
-ZoneAvoidanceRule -> ZoneAvoidancePredicate -> AvailabilityPredicate -> alwaysTrue -> chooseRoundRobinAfterFiltering
-MaxAutoRetriesNextServer 重新进入selectServer逻辑，重试的节点根据负载均衡策略选取，多节点的情况下可能继续重试到下线的节点上去
-
-# 监控
-actuator
-EndpointWebMvcAutoConfiguration -> maybe createChildManagementContext
-EndpointWebMvcManagementContextConfiguration
-
-boot-admin-client
-
-boot-admin-server
-  - client/eureka-reg/unreg -> map
-  - sse
-  - ui-request
-      - ZuulHandlerMapping -> lookupHandler(registerHandlers())
-  *
-  *
-  - reg/unreg -> pubEvent
-      - app-status <- receive event
-      - sse <- receive event
-      - app-router <- receive event
-
-# 服务追踪
-brave
-zipkin
-  - dependency-tree
-      - SpanNode.Builder -> SpanNode
-      - DependencyLinker -> DependencyLink
-
-# 配置中心
-
-# 服务断路
-
-# 服务治理
 
 # FAQ
 bean初始化时在init方法里面提前进行了rpc调用，现象是ribbon配置没有生效，原因是netflix全局使用了一个静态的资源配置，而这个静态配置还没有被spring注入

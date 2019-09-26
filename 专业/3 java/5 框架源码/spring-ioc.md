@@ -46,7 +46,7 @@ BeanFactory 主要由 SingletonBeanRegistry、HierarchicalBeanFactory、Configur
      */
     AnnotationConfigUtils.registerAnnotationConfigProcessors(this.registry);
 ### 第二步
-将 main-class 注册到 BeanFactory，通过这个类所在的 package 或注解 @ComponentScan，可以确定 bean 扫描路径
+将 main-class 注册到 BeanFactory，如果其注解了 @ComponentScan，则可以进行 bean 扫描
 
     // 注册 annotated classes 并自带 name & instanceSupplier & qualifiers & beanDefinitionCustomizer
     <T> void doRegisterBean(Class<T> annotatedClass, @Nullable Supplier<T> instanceSupplier, @Nullable String name,
@@ -138,9 +138,9 @@ BeanFactory 主要由 SingletonBeanRegistry、HierarchicalBeanFactory、Configur
         }
     }
 
-最重要的三个方法如下所示，这里不对代码作进一步展开
-- postProcessBeanFactory 初始化第二步的 BeanFactoryPostProcessor, 并调用 BeanFactoryPostProcessor 完成 beanDef 的注册
-- invokeBeanFactoryPostProcessors 初始化第二步 BeanPostProcessor，并将其注册到 BeanFactory
+以下为第三步中最重要的三个方法描述
+- invokeBeanFactoryPostProcessors 初始化 BeanFactoryPostProcessor, 并调用 BeanFactoryPostProcessor 完成 beanDef 的注册
+- registerBeanPostProcessors 初始化 BeanPostProcessor，并将其注册到 BeanFactory
 - finishBeanFactoryInitialization 初始化所有所有非延迟加载的单例 bean
 
 ## 环境
@@ -275,7 +275,7 @@ bean 的生命周期一共分为10步，其实现集中在 AbstractAutowireCapab
         }
 
 
-- 这个方法用于在“从单例集合获取不到bean时，转而从 earlySingletonObjects/singletonFactories 获取 bean”，而“singletonFactories”是由 bean 在创建完成之后加入的，所以可以解决循环依赖的单例 bean
+- 这个方法用于“从单例集合获取不到bean时，转而从 earlySingletonObjects/singletonFactories 获取 bean”，而“singletonFactories”是由 bean 在创建完成之后加入的，所以可以解决循环依赖的单例 bean
 
 - 参见 AbstractAutowireCapableBeanFactory.doCreateBean
 
@@ -318,7 +318,8 @@ bean 的生命周期一共分为10步，其实现集中在 AbstractAutowireCapab
 ### 同名bean
 - 参见 ConfigurationClassBeanDefinitionReader.loadBeanDefinitionsForBeanMethod
 
-        // 是否不允许覆盖已存在的 beanDefinition
+        // 是否正在覆盖已存在的 beanDefinition
+        // 如果是则不允许覆盖, 但当 beanName 同声明它的类名相同, 则抛出异常
         if (isOverriddenByExistingDefinition(beanMethod, beanName)) {
             if (beanName.equals(beanMethod.getConfigurationClass().getBeanName())) {
                 throw new BeanDefinitionStoreException(beanMethod.getConfigurationClass().getResource().getDescription(),
@@ -328,19 +329,19 @@ bean 的生命周期一共分为10步，其实现集中在 AbstractAutowireCapab
             return;
         }
 
-        // 是否不允许覆盖已存在的 beanDefinition
+        // 是否正在覆盖已存在的 beanDefinition
         protected boolean isOverriddenByExistingDefinition(BeanMethod beanMethod, String beanName) {
             if (!this.registry.containsBeanDefinition(beanName)) {
                 return false;
             }
             BeanDefinition existingBeanDef = this.registry.getBeanDefinition(beanName);
-            // 如果是相同 class 声明的同名 bean, 则不允许覆盖
+            // 如果声明 bean 的 class 相同, 则返回 true
             if (existingBeanDef instanceof ConfigurationClassBeanDefinition) {
                 ConfigurationClassBeanDefinition ccbd = (ConfigurationClassBeanDefinition) existingBeanDef;
                 return ccbd.getMetadata().getClassName().equals(
                         beanMethod.getConfigurationClass().getMetadata().getClassName());
             }
-            // 如果已存在的 BeanDef 是 ScannedGenericBeanDefinition, 则允许覆盖
+            // 如果已存在的 BeanDef 是 ScannedGenericBeanDefinition, 则返回 false
             if (existingBeanDef instanceof ScannedGenericBeanDefinition) {
                 return false;
             }
@@ -360,13 +361,13 @@ bean 的生命周期一共分为10步，其实现集中在 AbstractAutowireCapab
                         "already exists. This top-level bean definition is considered as an override.",
                         beanMethod, beanName));
             }
-            // 以上都不是, 则不允许覆盖
+            // 以上都不是, 则返回 true
             return true;
         }
 - 简而言之
-    - 相同 class 声明的同名 ConfigurationClassBeanDefinition, 则不允许覆盖
-    - 不同 class 声明的同名 ConfigurationClassBeanDefinition, 则允许覆盖
-    - ...and more
+    - 声明同名 bean 的 class 相同，则不允许覆盖
+        - beanName 同声明它的类名相同, 则抛出异常
+        - 如果 BeanFactory 设置为不允许覆盖，则抛出异常
 
 ## 事件机制
 ### 注册监听器

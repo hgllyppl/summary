@@ -8,7 +8,7 @@ spring-boot 由 SpringApplication、AutoConfigurationImportSelector、Annotation
 主要控制 spring-boot 应用的核心流程
 
 ### AutoConfigurationImportSelector
-选择所要的自动配置，并根据配置上条件进行过滤
+读取所有的自动配置，并根据配置条件过滤
 
 ### ConfigFileApplicationListener
 启动 ApplicatonContext 之前，初始化 Environment
@@ -213,50 +213,36 @@ spring-boot 由 SpringApplication、AutoConfigurationImportSelector、Annotation
             this.loggingSystem.beforeInitialize();
         }
 
-        // beforeInitialize
-        @Override
-        public void beforeInitialize() {
-            // 初始化 LoggerContext
-            LoggerContext loggerContext = getLoggerContext();
-            // 如果 LoggerContext 已初始化, 则返回
-            if (isAlreadyInitialized(loggerContext)) {
-                return;
-            }
-            // 将 jdk logger 接驳到 slf4j
-            super.beforeInitialize();
-            // ???
-            loggerContext.getTurboFilterList().add(FILTER);
-        }
-
-        // beforeInitialize
-        @Override
-        public void beforeInitialize() {
-            super.beforeInitialize();
-            // 将 jdk logger 接驳到 slf4j
-            configureJdkLoggingBridgeHandler();
-        }
-
-        private void configureJdkLoggingBridgeHandler() {
-            try {
-                // 是否可接驳 slf4j
-                if (isBridgeJulIntoSlf4j()) {
-                    // 移除 jdk handler
-                    removeJdkLoggingBridgeHandler();
-                    // 安装 slf4j handler
-                    SLF4JBridgeHandler.install();
-                }
-            }
-            catch (Throwable ex) {
-                // Ignore. No java.util.logging bridge is installed.
-            }
-        }
-
         // 初始化日志系统
         private void onApplicationEnvironmentPreparedEvent(ApplicationEnvironmentPreparedEvent event) {
             if (this.loggingSystem == null) {
                 this.loggingSystem = LoggingSystem.get(event.getSpringApplication().getClassLoader());
             }
             initialize(event.getEnvironment(), event.getSpringApplication().getClassLoader());
+        }
+
+        // 将日志系统注册到 beanFactory
+        private void onApplicationPreparedEvent(ApplicationPreparedEvent event) {
+            ConfigurableListableBeanFactory beanFactory = event.getApplicationContext().getBeanFactory();
+            if (!beanFactory.containsBean(LOGGING_SYSTEM_BEAN_NAME)) {
+                beanFactory.registerSingleton(LOGGING_SYSTEM_BEAN_NAME, this.loggingSystem);
+            }
+        }
+
+        /**
+         * 清理日志系统
+         * @see LogbackLoggingSystem#cleanUp
+         */
+        private void onContextClosedEvent() {
+            if (this.loggingSystem != null) {
+                this.loggingSystem.cleanUp();
+            }
+        }
+
+        private void onApplicationFailedEvent() {
+            if (this.loggingSystem != null) {
+                this.loggingSystem.cleanUp();
+            }
         }
 
         /**
@@ -300,6 +286,68 @@ spring-boot 由 SpringApplication、AutoConfigurationImportSelector、Annotation
                     ex.printStackTrace(System.err);
                     throw new IllegalStateException(ex);
                 }
+            }
+        }
+
+- 参见 LogbackLoggingSystem.beforeInitialize
+
+        // beforeInitialize
+        @Override
+        public void beforeInitialize() {
+            // 初始化 LoggerContext
+            LoggerContext loggerContext = getLoggerContext();
+            // 如果 LoggerContext 已初始化, 则返回
+            if (isAlreadyInitialized(loggerContext)) {
+                return;
+            }
+            // 将 jdk logger 接驳到 slf4j
+            super.beforeInitialize();
+            // ???
+            loggerContext.getTurboFilterList().add(FILTER);
+        }
+
+        // beforeInitialize
+        @Override
+        public void beforeInitialize() {
+            super.beforeInitialize();
+            // 将 jdk logger 接驳到 slf4j
+            configureJdkLoggingBridgeHandler();
+        }
+
+        private void configureJdkLoggingBridgeHandler() {
+            try {
+                // 是否可接驳 slf4j
+                if (isBridgeJulIntoSlf4j()) {
+                    // 移除 jdk handler
+                    removeJdkLoggingBridgeHandler();
+                    // 安装 slf4j handler
+                    SLF4JBridgeHandler.install();
+                }
+            }
+            catch (Throwable ex) {
+                // Ignore. No java.util.logging bridge is installed.
+            }
+        }
+
+- 参见 LogbackLoggingSystem.initialize
+
+        // 初始化日志系统
+        @Override
+        public void initialize(LoggingInitializationContext initializationContext, String configLocation, LogFile logFile) {
+            // 如果已初始化, 则返回
+            LoggerContext loggerContext = getLoggerContext();
+            if (isAlreadyInitialized(loggerContext)) {
+                return;
+            }
+            // 初始化日志系统
+            super.initialize(initializationContext, configLocation, logFile);
+            loggerContext.getTurboFilterList().remove(FILTER);
+            // 标记日志系统已初始化
+            markAsInitialized(loggerContext);
+            // 打印日志
+            if (StringUtils.hasText(System.getProperty(CONFIGURATION_FILE_PROPERTY))) {
+                getLogger(LogbackLoggingSystem.class.getName()).warn("Ignoring '" + CONFIGURATION_FILE_PROPERTY
+                        + "' system property. " + "Please use 'logging.config' instead.");
             }
         }
 
@@ -456,7 +504,11 @@ spring-boot 由 SpringApplication、AutoConfigurationImportSelector、Annotation
         }
 
 ## 选择自动配置
-- 参见 AutoConfigurationImportSelector.AutoConfigurationGroup.process
+- 参见 AutoConfigurationImportSelector.AutoConfigurationGroup.process/selectImports
+
+        private final Map<String, AnnotationMetadata> entries = new LinkedHashMap<>();
+
+        private final List<AutoConfigurationEntry> autoConfigurationEntries = new ArrayList<>();
 
         @Override
         public void process(AnnotationMetadata annotationMetadata, DeferredImportSelector deferredImportSelector) {
@@ -476,6 +528,30 @@ spring-boot 由 SpringApplication、AutoConfigurationImportSelector、Annotation
             }
         }
 
+        @Override
+        public Iterable<Entry> selectImports() {
+            if (this.autoConfigurationEntries.isEmpty()) {
+                return Collections.emptyList();
+            }
+            // 集合被排除的 configuration
+            Set<String> allExclusions = this.autoConfigurationEntries.stream()
+                    .map(AutoConfigurationEntry::getExclusions)
+                    .flatMap(Collection::stream)
+                    .collect(Collectors.toSet());
+            // 集合所有的 configuration
+            Set<String> processedConfigurations = this.autoConfigurationEntries.stream()
+                    .map(AutoConfigurationEntry::getConfigurations)
+                    .flatMap(Collection::stream)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            // 从所有 configuration 里移除被排除的 configuration
+            processedConfigurations.removeAll(allExclusions);
+            // 排序所有 configuration 并转换成 Entry
+            return sortAutoConfigurations(processedConfigurations, getAutoConfigurationMetadata())
+                    .stream()
+                    .map((importClassName) -> new Entry(this.entries.get(importClassName), importClassName))
+                    .collect(Collectors.toList());
+        }
+
         // 加载 META-INF/spring-autoconfigure-metadata.properties 配置
         private AutoConfigurationMetadata getAutoConfigurationMetadata() {
             if (this.autoConfigurationMetadata == null) {
@@ -484,6 +560,7 @@ spring-boot 由 SpringApplication、AutoConfigurationImportSelector、Annotation
             return this.autoConfigurationMetadata;
         }
 
+- 参见 AutoConfigurationImportSelector.getAutoConfigurationEntry
 
         /**
          * 选择所有的 configuration
@@ -565,30 +642,4 @@ spring-boot 由 SpringApplication、AutoConfigurationImportSelector、Annotation
                         + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime) + " ms");
             }
             return new ArrayList<>(result);
-        }
-
-- 参见 AutoConfigurationImportSelector.AutoConfigurationGroup.selectImports
-
-        @Override
-        public Iterable<Entry> selectImports() {
-            if (this.autoConfigurationEntries.isEmpty()) {
-                return Collections.emptyList();
-            }
-            // 集合被排除的 configuration
-            Set<String> allExclusions = this.autoConfigurationEntries.stream()
-                    .map(AutoConfigurationEntry::getExclusions)
-                    .flatMap(Collection::stream)
-                    .collect(Collectors.toSet());
-            // 集合所有的 configuration
-            Set<String> processedConfigurations = this.autoConfigurationEntries.stream()
-                    .map(AutoConfigurationEntry::getConfigurations)
-                    .flatMap(Collection::stream)
-                    .collect(Collectors.toCollection(LinkedHashSet::new));
-            // 从所有 configuration 里移除被排除的 configuration
-            processedConfigurations.removeAll(allExclusions);
-            // 排序所有 configuration 并转换成 Entry
-            return sortAutoConfigurations(processedConfigurations, getAutoConfigurationMetadata())
-                    .stream()
-                    .map((importClassName) -> new Entry(this.entries.get(importClassName), importClassName))
-                    .collect(Collectors.toList());
         }
