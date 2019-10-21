@@ -1,5 +1,5 @@
 # 本篇说明
-本系列为《tcp/ip 详解-卷1》浓缩，本篇ICMP浓缩。<br>
+本系列为《tcp/ip 详解-卷1》浓缩，本篇为ICMP浓缩。<br>
 <span style="color:red">红字</span>为重要说明，<span style="color:orange">橙字</span>为不确定说明，<span style="color:green">绿字</span>待定。
 
 # ICMP
