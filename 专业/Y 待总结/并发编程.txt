@@ -6,7 +6,7 @@ https://www.ibm.com/developerworks/cn/java/j-lo-processthread/
  
 线程状态
     NEW：新new了一个线程，还没有执行start方法
-    TERMINATED：一个线程正常执行结束？从JDK定义看，不包含因异常结束的线程 
+    TERMINATED：一个线程执行结束
     RUNNABLE ：线程可能在执行，也可能在等待CPU时间片
     BLOCKED：线程在等待锁以进入同步块/方法，或者在调用了Object.wait方法后等待锁以重新进入同步块/方法
     WAITING ：线程因调用了wait/join/park等方法而进入等待状态
@@ -124,3 +124,6 @@ https://www.cnblogs.com/skywang12345/
 
 【ITer_ZC的专栏】Java_NIO_随手记 - CSDN博客
 https://blog.csdn.net/iter_zc
+
+Java线程的5种状态及切换(透彻讲解)-京东面试 - aspirant - 博客园
+https://www.cnblogs.com/aspirant/p/8900276.html
