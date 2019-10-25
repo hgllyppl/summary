@@ -3,7 +3,7 @@
 <span style="color:red">红字</span>为重要说明，<span style="color:orange">橙字</span>为不确定说明，<span style="color:green">绿字</span>待定。
 
 # ICMP
-ICMP经常被认为是IP层的一个组成部分，它传递差错报文以及其他需要注意的信息。ICMP报文通常被IP层或更高层协议（TCP或UDP）使用，一些ICMP报文会被返回给用户进程。
+ICMP(Internet控制报文协议)经常被认为是IP层的一个组成部分，它传递差错报文以及其他需要注意的信息。ICMP报文通常被IP层或更高层协议（TCP或UDP）使用，一些ICMP报文会被返回给用户进程。
 
 ## ICMP 报文
 ICMP报文是在IP数据报内部被传输的，如下图示：
