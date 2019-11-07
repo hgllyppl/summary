@@ -1,0 +1,115 @@
+安装
+1 准备编译环境
+	yum install git gcc gcc-c++ make automake autoconf libtool pcre pcre-devel zlib zlib-devel openssl-devel wget vim -y
+2 下载安装文件
+	cd /usr/local/src
+	git clone https://github.com/happyfish100/libfastcommon.git --depth 1
+	git clone https://github.com/happyfish100/fastdfs.git --depth 1
+	git clone https://github.com/happyfish100/fastdfs-nginx-module.git --depth 1
+	wget http://nginx.org/download/nginx-1.15.4.tar.gz
+3 准备数据目录
+	mkdir /home/dfs #创建数据存储目录
+4 安装libfastcommon、fastdfs
+	cd /usr/local/src/libfastcommon && ./make.sh && ./make.sh install
+	cd /usr/local/src/fastdfs && ./make.sh && ./make.sh install
+5 准备fastdfs-nginx-module
+	cp /usr/local/src/fastdfs/conf/http.conf /etc/fdfs/                    #供nginx访问使用
+	cp /usr/local/src/fastdfs/conf/mime.types /etc/fdfs/                   #供nginx访问使用
+	cp /usr/local/src/fastdfs-nginx-module/src/mod_fastdfs.conf /etc/fdfs  #供nginx读取配置
+6 安装fastdfs-nginx-module
+	cd /usr/local/src/
+	tar -zxvf /usr/local/src/nginx-1.15.4.tar.gz
+	cd /usr/local/src/nginx-1.15.4
+	./configure --add-module=/usr/local/src/fastdfs-nginx-module/src/
+	make && make install	
+7 准备配置文件
+	cp /etc/fdfs/tracker.conf.sample /etc/fdfs/tracker.conf
+	cp /etc/fdfs/storage.conf.sample /etc/fdfs/storage.conf
+	cp /etc/fdfs/client.conf.sample /etc/fdfs/client.conf
+
+
+
+部署(准备部署为2个tracker、1个group搭2个storage)
+1 tracker配置
+	vim /etc/fdfs/tracker.conf
+	port=22122          # tracker服务器端口（默认22122,一般不修改）
+	base_path=/home/dfs # 存储日志和数据的根目录
+2 storage配置
+	vim /etc/fdfs/storage.conf
+	group_name=group1                  # storage挂载的分组名称
+	port=23000                         # storage服务端口（默认23000,一般不修改）
+	base_path=/home/dfs                # 数据和日志文件存储根目录
+	store_path_count=2                 # store_path的数量，有几个store_path就填几个
+	store_path0=/home/dfs              # 第一个存储目录
+	store_path1=/home/dfs1             # 第N个存储目录，下标以0开始至store_path_count-1结束，store_path的顺序一旦定了就不可变动
+	tracker_server=192.168.52.1:22122  # tracker服务器IP和端口
+	tracker_server=192.168.52.2:22122  # tracker有几个就配置几行
+	http.server_port=8888              # http访问文件的端口(默认8888,看情况修改,和nginx中保持一致)
+3 配置fastdfs-nginx-module[nginx必须在每个storage上都存在，才能正常访问所有group]
+	vim /etc/fdfs/mod_fastdfs.conf
+	tracker_server=192.168.52.1:22122  # tracker服务器IP和端口，同storage配置
+	group_name=group1                  # nginx和storage成对配置，这个group_name必须和storage中配置的group_name一致
+	url_have_group_name=true           # 访问路径中是否带group_name
+	store_path_count=1                 # 同storage配置
+	store_path0=/home/dfs              # 同storage配置
+4 配置nginx
+	vim /usr/local/nginx/conf/nginx.conf
+	# 追加如下配置
+	server {
+		listen       8888;    # 该端口为storage.conf中的http.server_port相同
+		server_name  localhost;
+		location ~/group[0-9]/ {
+			ngx_fastdfs_module;
+		}
+		error_page   500 502 503 504  /50x.html;
+		location = /50x.html {
+			root   html;
+		}
+	}
+5 启动tracker
+	/etc/init.d/fdfs_trackerd start   #启动tracker服务
+	/etc/init.d/fdfs_trackerd restart #重启动tracker服务
+	/etc/init.d/fdfs_trackerd stop    #停止tracker服务
+	chkconfig fdfs_trackerd on        #自启动tracker服务
+6 启动storage
+	/etc/init.d/fdfs_storaged start   #启动storage服务
+	/etc/init.d/fdfs_storaged restart #重动storage服务
+	/etc/init.d/fdfs_storaged stop    #停止动storage服务
+	chkconfig fdfs_storaged on        #自启动storage服务
+7 启动nginx
+	/usr/local/nginx/sbin/nginx             #启动nginx
+	/usr/local/nginx/sbin/nginx -s reload   #重启nginx
+	/usr/local/nginx/sbin/nginx -s stop     #停止nginx
+
+
+
+检测集群
+	/usr/bin/fdfs_monitor /etc/fdfs/storage.conf
+测试
+	vim /etc/fdfs/client.conf
+	base_path=/home/dfs
+	tracker_server=192.168.52.2:22122  # 同storage配置
+	# 保存后测试,返回ID表示成功 如：group1/M00/00/00/xx.tar.gz
+	fdfs_upload_file /etc/fdfs/client.conf /usr/local/src/nginx-1.15.4.tar.gz
+nginx访问
+	# 使用上传得到的文件id访问
+	http://localhost:8888/group1/M00/00/00/wKgAQ1pysxmAaqhAAA76tz-dVgg.tar.gz
+	
+
+
+权限配置
+	# 服务端
+	vim /etc/fdfs/http.conf
+	http.anti_steal.check_token=true
+	http.anti_steal.token_ttl=1800
+	http.anti_steal.secret_key=FASTDFS1234567890
+	# 这个参数没有就不填，填一个错误的地址会导致nginx启动失败
+	http.anti_steal.token_check_fail=
+	# 客户端
+	fastdfs.http_anti_steal_token=true
+	fastdfs.http_secret_key=FASTDFS1234567890
+	# 生成token
+	int ts = (int) Instant.now().getEpochSecond();
+    System.out.println(ProtoCommon.getToken("M00/00/00/rBkaBF3CndOAf6aLAAAGnFSrfMw95.conf", ts, "FastDFS1234567890"));
+	# 访问
+	http://localhost:8888/group1/M00/00/00/wKgAQ1pysxmAaqhAAA76tz-dVgg.tar.gz?token=XXXX&ts=11111
