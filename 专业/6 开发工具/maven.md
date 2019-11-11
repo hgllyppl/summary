@@ -1,4 +1,23 @@
 # 插件
+## 下载私服的库
+
+	<repositories>
+		<repository>
+			<id>私服id</id>
+			<url>私服地址</url>
+			<snapshots>
+				<enabled>true</enabled>
+				<checksumPolicy>warn</checksumPolicy>
+				<updatePolicy>always</updatePolicy>
+			</snapshots>
+			<releases>
+				<enabled>true</enabled>
+				<checksumPolicy>fail</checksumPolicy>
+				<updatePolicy>never</updatePolicy>
+			</releases>
+		</repository>
+	</repositories>
+
 ## maven release
 - 命令
 
@@ -11,11 +30,11 @@
 
         <distributionManagement>
             <snapshotRepository>
-                <id>snapshots</id>
+                <id>私服id</id>
                 <url>私服地址</url>
             </snapshotRepository>
             <repository>
-                <id>releases</id>
+                <id>私服id</id>
                 <url>私服地址</url>
             </repository>
         </distributionManagement>
