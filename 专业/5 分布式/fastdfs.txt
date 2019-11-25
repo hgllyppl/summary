@@ -39,11 +39,9 @@
 	group_name=group1                  # storage挂载的分组名称
 	port=23000                         # storage服务端口（默认23000,一般不修改）
 	base_path=/home/dfs                # 数据和日志文件存储根目录
-	store_path_count=2                 # store_path的数量，有几个store_path就填几个
-	store_path0=/home/dfs              # 第一个存储目录
-	store_path1=/home/dfs1             # 第N个存储目录，下标以0开始至store_path_count-1结束，store_path的顺序一旦定了就不可变动
+	store_path_count=1                 # store_path的数量，有几个store_path就填几个
+	store_path0=/home/dfs              # 第N个存储目录，下标以0开始至store_path_count - 1结束，store_path的顺序一旦定了就不可变动
 	tracker_server=192.168.52.1:22122  # tracker服务器IP和端口
-	tracker_server=192.168.52.2:22122  # tracker有几个就配置几行
 	http.server_port=8888              # http访问文件的端口(默认8888,看情况修改,和nginx中保持一致)
 3 配置fastdfs-nginx-module[nginx必须在每个storage上都存在，才能正常访问所有group]
 	vim /etc/fdfs/mod_fastdfs.conf
