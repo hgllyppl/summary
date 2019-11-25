@@ -27,8 +27,6 @@
                           -> code completion -> case sensitive
                -> colors & fonts -> font -> consolas/14
                                  -> console font -> consolas/14
-               -> live templates -> other -> avm/ivm/main/prsvm/prvm/pusvm/puvm/tryc/trycf/tryf/tvm
-                                 -> plain -> prsf/pusf/st
                -> file types -> ignore files and folders -> .idea;*.iml;
         build -> debugger -> stepping -> skip class loaders
                                       -> skip simple getters
