@@ -7,6 +7,7 @@
             build -> build tools -> maven -> importing -> auto/sources/jdk
                                           -> runner -> jdk/skip tests
             other settings -> auto import -> add unambiguous imports on the fly
+			                              -> optimize imports on the fly
         project structure
             project -> sdk & language level
             SDKs
