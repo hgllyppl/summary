@@ -1,0 +1,5 @@
+1 私有函数引发的代理血案
+条件: controller 加 @Validated 注解
+条件: controller 内的方法声明为私有
+结果: 当请求到来时，controller内的私有方法拿不到应该被注入的service
+原因: 私有方法不会被代理，所以走不到CglibAopProxy的代理逻辑，自然拿不到service
