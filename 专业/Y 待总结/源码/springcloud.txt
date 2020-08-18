@@ -1,84 +1,14 @@
-# SOA
-# 远程调用
-FeignClientsRegistrar
-  FeignClientsConfiguration
-FeignRibbonClientAutoConfiguration
-  DefaultFeignLoadBalancedConfiguration/HttpClientFeignLoadBalancedConfiguration/OkHttpFeignLoadBalancedConfiguration
+# RPC
+FeignClientsRegistrar/FeignClientFactoryBean
 FeignAutoConfiguration
-  FeignClientProperties/FeignHttpClientProperties
-
-FeginContext -> FeignBuilder -> Feign -> Proxy
-FeignClientFactoryBean.getObject()
-  -> getBean(FeignContext.class)
-  -> fegin(context)
-      -> get(context, Feign.Builder.class) -> prototype
-      -> configureFeign(context, builder)
-          -> configureUsingConfiguration -> 可以提供bean覆盖默认配置(FeignClientProperties)
-          -> configureUsingProperties
-  -> loadBalance(builder,context,HardCodedTarget)
-      -> getOptional(context, Client.class)
-          -> DefaultFeignLoadBalancedConfiguration.feignClient -> new LoadBalancerFeignClient(new Client.Default(null, null), cachingFactory, clientFactory)
-      -> builder.client(client)
-      -> get(context, Targeter.class)
-      -> targeter.target(this, builder, context, HardCodedTarget)
-          -> builder.target(HardCodedTarget)
-              -> build()
-                  -> new SynchronousMethodHandler.Factory(builder)
-                  -> new ParseHandlersByName(builder,SynchronousMethodHandler.Factory)
-                  -> new ReflectiveFeign(ParseHandlersByName, SynchronousMethodHandler.Factory)
-              -> newInstance(HardCodedTarget)
-                  -> ParseHandlersByName.apply(target)[Map<String, MethodHandler>]
-                  -> Map<String, MethodHandler> -> Map<Method, MethodHandler>
-                  -> new ReflectiveFeign.FeignInvocationHandler(HardCodedTarget, Map<Method, MethodHandler>)
-                  -> Proxy.newProxyInstance
-
-SynchronousMethodHandler.invoke
-  -> buildTemplateFromArgs.create(argv)
-      -> ...
-  -> executeAndDecode(template)
-      -> targetRequest(template)
-          -> IF interceptor.apply(template)
-          -> RequestTemplate.request()
-      -> client.execute(request, options)[LoadBalancerFeignClient]
-          -> clientName & uriWithoutHost
-          -> new FeignLoadBalancer.RibbonRequest(this.delegate, request, uriWithoutHost)
-          -> getClientConfig(options, clientName)
-              -> DEFAULT_OPTIONS ? clientFactory.getClientConfig(clientName)[RibbonClientConfiguration.ribbonClientConfig] : new FeignOptionsClientConfig(options)
-          -> lbClient(clientName)
-              -> lbClientFactory.create(clientName)
-                  -> lb & config & serverIntrospector -> factory.getInstance(clientName, IClientConfig/ILoadBalancer/ServerIntrospector.class);
-                  -> enableRetry ? new RetryableFeignLoadBalancer(lb, config, serverIntrospector, loadBalancedRetryPolicyFactory, loadBalancedBackOffPolicyFactory, loadBalancedRetryListenerFactory)
-                                    : new FeignLoadBalancer(lb, config, serverIntrospector)
-          -> FeignLoadBalancer.executeWithLoadBalancer(ribbonRequest, requestConfig)
-              -> buildLoadBalancerCommand(ribbonRequest, requestConfig)
-                  -> getRequestSpecificRetryHandler(ribbonRequest, requestConfig)
-                  -> LoadBalancerCommand.builder().build()
-              -> command.submit(new ServerOperation(){...})
-                  -> Observable.create/just.concatMap(new Func1<Server, Observable<T>>() {...})
-                  -> IF o.retry(retryPolicy(maxRetrysNext, false))
-                  -> o.onErrorResumeNext(new Func1<Throwable, Observable<T>>() {...})
-              -> command.toBlocking().single()
-                  -> selectServer() -> loadBalancerContext.getServerFromLoadBalancer(loadBalancerURI, loadBalancerKey) -> getLoadBalancer().chooseServer(loadBalancerKey)
-                  -> loadBalancerContext.getServerStats(server) -> getLoadBalancer().getLoadBalancerStats().getSingleServerStat(server)
-                  -> loadBalancerContext.noteOpenConnection(stats)
-                  -> reconstructRequest & execute(reconstructRequest, requestConfig)
-                      -> executeHttpRequest(FeignLoadBalancer/OkHttpLoadBalancingClient/RibbonLoadBalancingHttpClient)
-                  -> loadBalancerContext.noteRequestCompletion(stats, ...)
-          -> RibbonResponse.toResponse()
-      -> decode(response)
-          -> decoder.decode(response, metadata.returnType())
-              -> decoder.decode(response, type)
-                  -> extractor.extractData(new FeignResponseAdapter(response))
-                      -> genericMessageConverter.read(this.responseType, null, responseWrapper)
-      -> ensureClosed(response.body())
+  FeignContext/FeignClientsConfiguration
+FeignRibbonClientAutoConfiguration
+  DefaultFeignLoadBalancedConfiguration
 
 # 负责均衡
-ribbon(RibbonAutoConfiguration/EurekaRibbonClientConfiguration/RibbonClientConfiguration)
-init
-back
-exec
-ZoneAvoidanceRule -> ZoneAvoidancePredicate -> AvailabilityPredicate -> alwaysTrue -> chooseRoundRobinAfterFiltering
-MaxAutoRetriesNextServer 重新进入selectServer逻辑，重试的节点根据负载均衡策略选取，多节点的情况下可能继续重试到下线的节点上去
+RibbonAutoConfiguration
+RibbonClients/EurekaRibbonClientConfiguration
+SpringClientFactory/RibbonClientConfiguration
 
 # 服务注册与发现
 芋道源码 http://www.iocoder.cn/categories/Eureka/
