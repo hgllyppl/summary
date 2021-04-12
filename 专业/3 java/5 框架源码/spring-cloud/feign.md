@@ -5,7 +5,10 @@
 spring-cloud-open-feign 由两部分组成，分为 feign 与 spring-cloud-open-feign。
 - feign 通过解析预定义的接口来构建代理实现，代理完成对请求数据的序列化以及远程服务调用。
 - spring-cloud-open-feign 为每个预定义接口提供了相同的 BeanDefinition(FeignClientFactoryBean) 以及一个 applicationContext 来存储每个接口的配置，并由 FeignContext 来管理。
-
+- 关键配置
+	- FeignClientsRegistrar/FeignClientFactoryBean
+	- FeignAutoConfiguration/FeignContext/FeignClientsConfiguration
+	- FeignRibbonClientAutoConfiguration/DefaultFeignLoadBalancedConfiguration
 ## 注册 BeanDefinition
 
 	@Retention(RetentionPolicy.RUNTIME)

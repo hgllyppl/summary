@@ -7,7 +7,7 @@ FeignRibbonClientAutoConfiguration
 
 # 负责均衡
 RibbonAutoConfiguration
-RibbonClients/EurekaRibbonClientConfiguration
+RibbonEurekaAutoConfiguration/EurekaRibbonClientConfiguration
 SpringClientFactory/RibbonClientConfiguration
 
 # 服务注册与发现
