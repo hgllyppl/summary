@@ -26,8 +26,8 @@
         editor -> general -> appearance -> show line numbers
                                         -> show parameter name hints
                           -> code completion -> case sensitive
-               -> colors & fonts -> font -> consolas/14
-                                 -> console font -> consolas/14
+               -> colors & fonts -> font -> consolas/15
+                                 -> console font -> consolas/15
                -> file types -> ignore files and folders -> .idea;*.iml;
         build -> debugger -> stepping -> skip class loaders
                                       -> skip simple getters
@@ -43,13 +43,6 @@
                                             org.springframework.boot.logging.logback.*
                                             org.springframework.boot.ansi.*
                           -> hotswap -> reload classes after compilation -> always
-
-## generate
-        toString -> settings -> templates
-        ToStringBuilder(Fast-JSON)  
-        public String toString() {
-            return com.alibaba.fastjson.JSON.toJSONString(this);
-        }
 
 ## live templates
 - other
